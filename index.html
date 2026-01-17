@@ -3,6 +3,7 @@
 <head>
 <meta charset="UTF-8">
 <title>Carnivorous</title>
+
 <style>
 body {
   margin: 0;
@@ -24,7 +25,7 @@ header img {
 }
 
 header h1 {
-  font-size: 40px;
+  font-size: 42px;
   margin: 0;
   flex: 1;
 }
@@ -44,18 +45,36 @@ header input, header select {
 }
 
 .categoria h2 {
-  border-bottom: 2px solid #444;
+  border-bottom: 2px solid #333;
+  padding-bottom: 5px;
 }
 
 .produto {
-  display: flex;
-  justify-content: space-between;
-  padding: 10px 0;
+  padding: 12px 0;
   border-bottom: 1px solid #222;
 }
 
+.nome {
+  font-weight: bold;
+  font-size: 16px;
+}
+
+.preco {
+  margin: 5px 0;
+}
+
+.controle {
+  margin-top: 8px;
+}
+
 .controle button {
-  padding: 5px 10px;
+  padding: 4px 10px;
+  font-size: 16px;
+}
+
+.controle span {
+  margin: 0 10px;
+  font-weight: bold;
 }
 
 #botaoCarrinho {
@@ -86,7 +105,9 @@ header input, header select {
 <header>
   <img src="logo.png">
   <h1>Carnivorous</h1>
-  <input id="busca" placeholder="Buscar..." onkeyup="filtrarProdutos()">
+
+  <input id="busca" placeholder="Buscar produto..." onkeyup="filtrarProdutos()">
+
   <select id="filtroCategoria" onchange="filtrarProdutos()">
     <option value="">Categorias</option>
   </select>
@@ -108,6 +129,7 @@ header input, header select {
 </div>
 
 <script>
+// ================= PRODUTOS =================
 const produtos = [
  {
   nome: "Chorizo Estância 92 Resfr.",
@@ -1473,18 +1495,24 @@ const produtos = [
 },
 ];
 
+// ================= VARIÁVEIS =================
 const carrinho = {};
+const produtosDiv = document.getElementById("produtos");
+const carrinhoDiv = document.getElementById("carrinho");
 
+// ================= CATEGORIAS =================
 function carregarCategorias() {
-  const sel = filtroCategoria;
-  [...new Set(produtos.map(p => p.categoria))].forEach(c => {
-    sel.innerHTML += `<option value="${c}">${c}</option>`;
+  const categorias = [...new Set(produtos.map(p => p.categoria))];
+  categorias.forEach(c => {
+    filtroCategoria.innerHTML += `<option value="${c}">${c}</option>`;
   });
 }
 
+// ================= RENDER =================
 function renderizarProdutos(lista = produtos) {
   produtosDiv.innerHTML = "";
   const porCat = {};
+
   lista.forEach(p => {
     porCat[p.categoria] = porCat[p.categoria] || [];
     porCat[p.categoria].push(p);
@@ -1492,23 +1520,27 @@ function renderizarProdutos(lista = produtos) {
 
   for (const cat in porCat) {
     produtosDiv.innerHTML += `<div class="categoria"><h2>${cat}</h2></div>`;
+
     porCat[cat].forEach(p => {
       const id = p.nome.replace(/\W/g,'');
       produtosDiv.innerHTML += `
-      <div class="produto">
-        <div>${p.nome} - R$ ${p.preco.toFixed(2)}</div>
-        <div class="controle">
-          <button onclick="remover('${p.nome}')">−</button>
-          <span id="qtd-${id}">0</span>
-          <button onclick="adicionar('${p.nome}',${p.preco})">+</button>
+        <div class="produto">
+          <div class="nome">${p.nome}</div>
+          <div class="preco">R$ ${p.preco.toFixed(2)}</div>
+          <div class="controle">
+            <button onclick="remover('${p.nome}')">−</button>
+            <span id="qtd-${id}">0</span>
+            <button onclick="adicionar('${p.nome}', ${p.preco})">+</button>
+          </div>
         </div>
-      </div>`;
+      `;
     });
   }
 }
 
+// ================= CARRINHO =================
 function adicionar(nome, preco) {
-  carrinho[nome] = carrinho[nome] || {nome, preco, qtd:0};
+  carrinho[nome] = carrinho[nome] || { nome, preco, qtd: 0 };
   carrinho[nome].qtd++;
   atualizar();
 }
@@ -1521,27 +1553,36 @@ function remover(nome) {
 }
 
 function atualizar() {
-  let qtd = 0, total = 0;
+  let qtdTotal = 0;
+  let total = 0;
+
+  document.querySelectorAll('[id^="qtd-"]').forEach(e => e.innerText = "0");
+
   for (const i in carrinho) {
-    qtd += carrinho[i].qtd;
+    qtdTotal += carrinho[i].qtd;
     total += carrinho[i].qtd * carrinho[i].preco;
+
     const span = document.getElementById("qtd-" + i.replace(/\W/g,''));
     if (span) span.innerText = carrinho[i].qtd;
   }
-  qtdCarrinho.innerText = qtd;
+
+  qtdCarrinho.innerText = qtdTotal;
   totalCarrinho.innerText = "R$ " + total.toFixed(2);
 }
 
+// ================= VISUALIZAÇÃO =================
 function abrirCarrinho() {
   carrinhoDiv.style.display = "block";
   listaCarrinho.innerHTML = "";
   let total = 0;
+
   for (const i in carrinho) {
     const it = carrinho[i];
     const sub = it.qtd * it.preco;
     total += sub;
     listaCarrinho.innerHTML += `${it.nome} x${it.qtd} = R$ ${sub.toFixed(2)}<br>`;
   }
+
   totalFinal.innerText = "TOTAL: R$ " + total.toFixed(2);
 }
 
@@ -1549,40 +1590,62 @@ function fecharCarrinho() {
   carrinhoDiv.style.display = "none";
 }
 
+// ================= WHATSAPP =================
 function finalizarPedido() {
   let tipo = prompt("Entrega ou Retirada?").toLowerCase();
   let entrega = tipo.includes("entrega") || tipo === "1";
-  let endereco = entrega ? prompt("Endereço completo:") : "";
-  let pagamento = prompt("Pagamento: Débito, Crédito, Vale ou Pix");
 
-  let msg = "Pedido Carnivorous%0A";
+  let endereco = "";
+  if (entrega) {
+    endereco = prompt("Informe o endereço completo:");
+    if (!endereco) return;
+
+    alert(
+      "⚠️ Aviso:\nCobramos taxa de entrega por KM.\n" +
+      "Após enviar o pedido no WhatsApp, calcularemos o valor da entrega."
+    );
+  }
+
+  let pagamento = prompt("Forma de pagamento: Débito, Crédito, Vale ou Pix");
+  if (!pagamento) return;
+
+  let msg = "🛒 Pedido Carnivorous%0A%0A";
   let total = 0;
 
   for (const i in carrinho) {
-    let s = carrinho[i].qtd * carrinho[i].preco;
-    total += s;
-    msg += `${i} x${carrinho[i].qtd} = R$ ${s.toFixed(2)}%0A`;
+    let sub = carrinho[i].qtd * carrinho[i].preco;
+    total += sub;
+    msg += `${i}%0AQtd: ${carrinho[i].qtd}%0ASubtotal: R$ ${sub.toFixed(2)}%0A%0A`;
   }
 
   msg += `TOTAL: R$ ${total.toFixed(2)}%0A`;
-  if (entrega) msg += `Endereço: ${endereco}%0A`;
-  msg += `Pagamento: ${pagamento}`;
+
+  if (entrega) {
+    msg += `📍 Endereço: ${endereco}%0A`;
+    msg += `⚠️ Taxa de entrega será calculada por KM e informada no WhatsApp.%0A`;
+  } else {
+    msg += "🏪 Retirada no local%0A";
+  }
+
+  msg += `💳 Pagamento: ${pagamento}`;
 
   window.open(`https://wa.me/5511999562721?text=${msg}`);
 }
 
+// ================= FILTRO =================
 function filtrarProdutos() {
   const t = busca.value.toLowerCase();
   const c = filtroCategoria.value;
-  renderizarProdutos(produtos.filter(p =>
-    p.nome.toLowerCase().includes(t) &&
-    (!c || p.categoria === c)
-  ));
+
+  renderizarProdutos(
+    produtos.filter(p =>
+      p.nome.toLowerCase().includes(t) &&
+      (!c || p.categoria === c)
+    )
+  );
 }
 
-const produtosDiv = document.getElementById("produtos");
-const carrinhoDiv = document.getElementById("carrinho");
-
+// ================= INIT =================
 carregarCategorias();
 renderizarProdutos();
 </script>
