@@ -11,7 +11,6 @@ body {
   background: #000;
   color: #fff;
 }
-
 header {
   display: flex;
   align-items: center;
@@ -19,64 +18,18 @@ header {
   padding: 15px;
   background: #111;
 }
-
-header img {
-  height: 60px;
-}
-
-header h1 {
-  font-size: 42px;
-  margin: 0;
-  flex: 1;
-}
-
+header img { height: 60px; }
+header h1 { font-size: 42px; margin: 0; flex: 1; }
 header input, header select {
   padding: 8px;
   border-radius: 6px;
   border: none;
 }
-
-#produtos {
-  padding: 20px;
-}
-
-.categoria {
-  margin-top: 30px;
-}
-
-.categoria h2 {
-  border-bottom: 2px solid #333;
-  padding-bottom: 5px;
-}
-
-.produto {
-  padding: 12px 0;
-  border-bottom: 1px solid #222;
-}
-
-.nome {
-  font-weight: bold;
-  font-size: 16px;
-}
-
-.preco {
-  margin: 5px 0;
-}
-
-.controle {
-  margin-top: 8px;
-}
-
-.controle button {
-  padding: 4px 10px;
-  font-size: 16px;
-}
-
-.controle span {
-  margin: 0 10px;
-  font-weight: bold;
-}
-
+#produtos { padding: 20px; }
+.categoria { margin-top: 30px; }
+.categoria h2 { border-bottom: 2px solid #333; }
+.produto { padding: 12px 0; border-bottom: 1px solid #222; }
+.nome { font-weight: bold; }
 #botaoCarrinho {
   position: fixed;
   bottom: 20px;
@@ -86,9 +39,7 @@ header input, header select {
   padding: 15px;
   border-radius: 50%;
   cursor: pointer;
-  text-align: center;
 }
-
 #carrinho {
   display: none;
   position: fixed;
@@ -105,9 +56,7 @@ header input, header select {
 <header>
   <img src="logo.png">
   <h1>Carnivorous</h1>
-
   <input id="busca" placeholder="Buscar produto..." onkeyup="filtrarProdutos()">
-
   <select id="filtroCategoria" onchange="filtrarProdutos()">
     <option value="">Categorias</option>
   </select>
@@ -128,201 +77,99 @@ header input, header select {
   <button onclick="fecharCarrinho()">Fechar</button>
 </div>
 
-<script>
-// ================= PRODUTOS =================
-const produtos = [
-<!-- PAPA PARSE -->
+<!-- PAPAPARSE -->
 <script src="https://cdn.jsdelivr.net/npm/papaparse@5.4.1/papaparse.min.js"></script>
 
 <script>
+let produtos = [];
+const carrinho = {};
+
+const produtosDiv = document.getElementById("produtos");
+const carrinhoDiv = document.getElementById("carrinho");
+const filtroCategoria = document.getElementById("filtroCategoria");
+const busca = document.getElementById("busca");
+
 const PLANILHA_URL =
 "https://docs.google.com/spreadsheets/d/e/2PACX-1vTsqDIhOoTibb56-QuExYbR9PfD1Fbu4y5x1a9k3X5BcLdl3rRA7tGmCQNI_Gn-uAlkYdUr1FtMigyA/pub?output=csv";
 
-let produtos = [];
-
+/* ===== PLANILHA ===== */
 Papa.parse(PLANILHA_URL, {
   download: true,
   header: true,
   skipEmptyLines: true,
-  complete: function (resultado) {
-
-    produtos = resultado.data.map(linha => ({
-      nome: linha["nome"] || linha["Nome"] || linha["PRODUTO"],
-      categoria: linha["categoria"] || linha["Categoria"],
-      unidade: linha["unidade"] || linha["Unidade"],
-      preco: parseFloat(
-        String(linha["preco"] || linha["Preço"] || linha["Valor"])
-          .replace("R$", "")
-          .replace(/\./g, "")
-          .replace(",", ".")
-      ) || 0
+  complete: res => {
+    produtos = res.data.map(l => ({
+      nome: l.nome,
+      categoria: l.categoria,
+      unidade: l.unidade,
+      preco: Number(String(l.preco).replace(",", "."))
     }));
-
     carregarCategorias();
     renderizarProdutos();
-  },
-  error: function (err) {
-    alert("Erro ao carregar a planilha");
-    console.error(err);
   }
 });
-</script>
 
-];
-
-// ================= VARIÁVEIS =================
-const carrinho = {};
-const produtosDiv = document.getElementById("produtos");
-const carrinhoDiv = document.getElementById("carrinho");
-
-// ================= CATEGORIAS =================
-function carregarCategorias() {
-  const categorias = [...new Set(produtos.map(p => p.categoria))];
-  categorias.forEach(c => {
-    filtroCategoria.innerHTML += `<option value="${c}">${c}</option>`;
-  });
+/* ===== CATEGORIAS ===== */
+function carregarCategorias(){
+  filtroCategoria.innerHTML = `<option value="">Categorias</option>`;
+  [...new Set(produtos.map(p => p.categoria))]
+    .forEach(c => filtroCategoria.innerHTML += `<option>${c}</option>`);
 }
 
-// ================= RENDER =================
-function renderizarProdutos(lista = produtos) {
+/* ===== RENDER ===== */
+function renderizarProdutos(lista = produtos){
   produtosDiv.innerHTML = "";
   const porCat = {};
+  lista.forEach(p => (porCat[p.categoria] ??= []).push(p));
 
-  lista.forEach(p => {
-    porCat[p.categoria] = porCat[p.categoria] || [];
-    porCat[p.categoria].push(p);
-  });
-
-  for (const cat in porCat) {
+  for(const cat in porCat){
     produtosDiv.innerHTML += `<div class="categoria"><h2>${cat}</h2></div>`;
-
     porCat[cat].forEach(p => {
-      const id = p.nome.replace(/\W/g,'');
+      const id = p.nome.replace(/\W/g,"");
       produtosDiv.innerHTML += `
-        <div class="produto">
-          <div class="nome">${p.nome}</div>
-          <div class="preco">R$ ${p.preco.toFixed(2)}</div>
-          <div class="controle">
-            <button onclick="remover('${p.nome}')">−</button>
-            <span id="qtd-${id}">0</span>
-            <button onclick="adicionar('${p.nome}', ${p.preco})">+</button>
-          </div>
-        </div>
-      `;
+      <div class="produto">
+        <div class="nome">${p.nome}</div>
+        <div>R$ ${p.preco.toFixed(2)}</div>
+        <button onclick="remover('${p.nome}')">−</button>
+        <span id="qtd-${id}">0</span>
+        <button onclick="adicionar('${p.nome}',${p.preco})">+</button>
+      </div>`;
     });
   }
 }
 
-// ================= CARRINHO =================
-function adicionar(nome, preco) {
-  carrinho[nome] = carrinho[nome] || { nome, preco, qtd: 0 };
-  carrinho[nome].qtd++;
-  atualizar();
+/* ===== CARRINHO ===== */
+function adicionar(nome,preco){
+  carrinho[nome] ??= {nome,preco,qtd:0};
+  carrinho[nome].qtd++; atualizar();
 }
-
-function remover(nome) {
-  if (!carrinho[nome]) return;
+function remover(nome){
+  if(!carrinho[nome]) return;
   carrinho[nome].qtd--;
-  if (carrinho[nome].qtd <= 0) delete carrinho[nome];
+  if(carrinho[nome].qtd<=0) delete carrinho[nome];
   atualizar();
 }
-
-function atualizar() {
-  let qtdTotal = 0;
-  let total = 0;
-
-  document.querySelectorAll('[id^="qtd-"]').forEach(e => e.innerText = "0");
-
-  for (const i in carrinho) {
-    qtdTotal += carrinho[i].qtd;
-    total += carrinho[i].qtd * carrinho[i].preco;
-
-    const span = document.getElementById("qtd-" + i.replace(/\W/g,''));
-    if (span) span.innerText = carrinho[i].qtd;
+function atualizar(){
+  let qtd=0,total=0;
+  document.querySelectorAll('[id^="qtd-"]').forEach(e=>e.innerText=0);
+  for(const i in carrinho){
+    qtd+=carrinho[i].qtd;
+    total+=carrinho[i].qtd*carrinho[i].preco;
+    document.getElementById("qtd-"+i.replace(/\W/g,"")).innerText=carrinho[i].qtd;
   }
-
-  qtdCarrinho.innerText = qtdTotal;
-  totalCarrinho.innerText = "R$ " + total.toFixed(2);
+  qtdCarrinho.innerText=qtd;
+  totalCarrinho.innerText="R$ "+total.toFixed(2);
 }
 
-// ================= VISUALIZAÇÃO =================
-function abrirCarrinho() {
-  carrinhoDiv.style.display = "block";
-  listaCarrinho.innerHTML = "";
-  let total = 0;
-
-  for (const i in carrinho) {
-    const it = carrinho[i];
-    const sub = it.qtd * it.preco;
-    total += sub;
-    listaCarrinho.innerHTML += `${it.nome} x${it.qtd} = R$ ${sub.toFixed(2)}<br>`;
-  }
-
-  totalFinal.innerText = "TOTAL: R$ " + total.toFixed(2);
+/* ===== FILTRO ===== */
+function filtrarProdutos(){
+  const t=busca.value.toLowerCase();
+  const c=filtroCategoria.value;
+  renderizarProdutos(produtos.filter(p =>
+    p.nome.toLowerCase().includes(t) &&
+    (!c || p.categoria===c)
+  ));
 }
-
-function fecharCarrinho() {
-  carrinhoDiv.style.display = "none";
-}
-
-// ================= WHATSAPP =================
-function finalizarPedido() {
-  let tipo = prompt("Entrega ou Retirada?").toLowerCase();
-  let entrega = tipo.includes("entrega") || tipo === "1";
-
-  let endereco = "";
-  if (entrega) {
-    endereco = prompt("Informe o endereço completo:");
-    if (!endereco) return;
-
-    alert(
-      "⚠️ Aviso:\nCobramos taxa de entrega por KM.\n" +
-      "Após enviar o pedido no WhatsApp, calcularemos o valor da entrega."
-    );
-  }
-
-  let pagamento = prompt("Forma de pagamento: Débito, Crédito, Vale ou Pix");
-  if (!pagamento) return;
-
-  let msg = "🛒 Pedido Carnivorous%0A%0A";
-  let total = 0;
-
-  for (const i in carrinho) {
-    let sub = carrinho[i].qtd * carrinho[i].preco;
-    total += sub;
-    msg += `${i}%0AQtd: ${carrinho[i].qtd}%0ASubtotal: R$ ${sub.toFixed(2)}%0A%0A`;
-  }
-
-  msg += `TOTAL: R$ ${total.toFixed(2)}%0A`;
-
-  if (entrega) {
-    msg += `📍 Endereço: ${endereco}%0A`;
-    msg += `⚠️ Taxa de entrega será calculada por KM e informada no WhatsApp.%0A`;
-  } else {
-    msg += "🏪 Retirada no local%0A";
-  }
-
-  msg += `💳 Pagamento: ${pagamento}`;
-
-  window.open(`https://wa.me/5511999562721?text=${msg}`);
-}
-
-// ================= FILTRO =================
-function filtrarProdutos() {
-  const t = busca.value.toLowerCase();
-  const c = filtroCategoria.value;
-
-  renderizarProdutos(
-    produtos.filter(p =>
-      p.nome.toLowerCase().includes(t) &&
-      (!c || p.categoria === c)
-    )
-  );
-}
-
-// ================= INIT =================
-carregarCategorias();
-renderizarProdutos();
 </script>
 
 </body>
