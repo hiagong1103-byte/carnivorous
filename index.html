@@ -7,60 +7,74 @@
 <script src="https://cdn.jsdelivr.net/npm/papaparse@5.4.1/papaparse.min.js"></script>
 
 <style>
-body { margin:0; font-family:Arial; background:#000; color:#fff; }
-
-header {
-  display:flex;
-  align-items:center;
-  gap:15px;
-  padding:15px;
-  background:#111;
+body {
+  margin: 0;
+  font-family: Arial, sans-serif;
+  background: #000;
+  color: #fff;
 }
 
-header img { height:70px; }
+header {
+  display: flex;
+  align-items: center;
+  gap: 15px;
+  padding: 15px;
+  background: #111;
+}
+
+header img { height: 70px; }
 
 header h1 {
-  font-size:48px;
-  margin:0;
-  flex:1;
-  letter-spacing:2px;
+  font-size: 48px;
+  margin: 0;
+  flex: 1;
 }
 
 header input, header select {
-  padding:8px;
-  border-radius:6px;
-  border:none;
+  padding: 8px;
+  border-radius: 6px;
+  border: none;
 }
 
-#produtos { padding:20px; }
+#produtos { padding: 20px; }
 
-.categoria { margin-top:30px; }
-.categoria h2 { border-bottom:2px solid #333; }
+.categoria { margin-top: 30px; }
 
-.produto { border-bottom:1px solid #222; padding:12px 0; }
+.categoria h2 {
+  border-bottom: 2px solid #333;
+  padding-bottom: 5px;
+}
 
-.controle button { padding:4px 12px; font-size:18px; }
+.produto {
+  padding: 12px 0;
+  border-bottom: 1px solid #222;
+}
+
+.controle button {
+  padding: 4px 12px;
+  font-size: 18px;
+}
 
 #botaoCarrinho {
-  position:fixed;
-  bottom:20px;
-  right:20px;
-  background:#25d366;
-  color:#000;
-  padding:15px;
-  border-radius:14px;
-  cursor:pointer;
-  text-align:center;
-  font-weight:bold;
+  position: fixed;
+  bottom: 20px;
+  right: 20px;
+  background: #25d366;
+  color: #000;
+  padding: 15px;
+  border-radius: 14px;
+  cursor: pointer;
+  font-weight: bold;
+  text-align: center;
 }
 
 #carrinho {
-  display:none;
-  position:fixed;
-  inset:0;
-  background:#000;
-  padding:20px;
-  overflow:auto;
+  display: none;
+  position: fixed;
+  inset: 0;
+  background: #000;
+  padding: 20px;
+  overflow: auto;
 }
 </style>
 </head>
@@ -97,26 +111,26 @@ header input, header select {
 const PLANILHA =
 "https://docs.google.com/spreadsheets/d/e/2PACX-1vTsqDIhOoTibb56-QuExYbR9PfD1Fbu4y5x1a9k3X5BcLdl3rRA7tGmCQNI_Gn-uAlkYdUr1FtMigyA/pub?output=csv";
 
-let produtos = [];
-const carrinho = {};
-
 const produtosDiv = document.getElementById("produtos");
 const carrinhoDiv = document.getElementById("carrinho");
 
-Papa.parse(PLANILHA, {
-  download:true,
-  header:true,
-  skipEmptyLines:true,
-  complete: res => {
+let listaProdutos = [];
+const carrinho = {};
 
-    produtos = res.data.map(l => ({
+Papa.parse(PLANILHA, {
+  download: true,
+  header: true,
+  skipEmptyLines: true,
+  complete: function(res) {
+
+    listaProdutos = res.data.map(l => ({
       nome: l["Descrição do Produto"],
       categoria: l["Categoria"],
       preco: Number(
         String(l["Valor Venda"])
           .replace("R$", "")
-          .replace(/\./g,"")
-          .replace(",",".")
+          .replace(/\./g, "")
+          .replace(",", ".")
       )
     })).filter(p => p.nome && p.categoria && p.preco);
 
@@ -125,78 +139,128 @@ Papa.parse(PLANILHA, {
   }
 });
 
-function carregarCategorias(){
-  const cats=[...new Set(produtos.map(p=>p.categoria))];
-  cats.forEach(c=>{
-    filtroCategoria.innerHTML+=`<option value="${c}">${c}</option>`;
+function carregarCategorias() {
+  const cats = [...new Set(listaProdutos.map(p => p.categoria))];
+  cats.forEach(c => {
+    filtroCategoria.innerHTML += `<option value="${c}">${c}</option>`;
   });
 }
 
-function renderizarProdutos(lista=produtos){
-  produtosDiv.innerHTML="";
-  const porCat={};
+function renderizarProdutos(lista = listaProdutos) {
+  produtosDiv.innerHTML = "";
+  const porCat = {};
 
-  lista.forEach(p=>{
-    porCat[p.categoria]=porCat[p.categoria]||[];
+  lista.forEach(p => {
+    porCat[p.categoria] = porCat[p.categoria] || [];
     porCat[p.categoria].push(p);
   });
 
-  for(const c in porCat){
-    produtosDiv.innerHTML+=`<div class="categoria"><h2>${c}</h2></div>`;
-    porCat[c].forEach(p=>{
-      const id=p.nome.replace(/\W/g,"");
-      produtosDiv.innerHTML+=`
-      <div class="produto">
-        <strong>${p.nome}</strong><br>
-        R$ ${p.preco.toFixed(2)}
-        <div class="controle">
-          <button onclick="remover('${p.nome}')">−</button>
-          <span id="qtd-${id}">0</span>
-          <button onclick="adicionar('${p.nome}',${p.preco})">+</button>
-        </div>
-      </div>`;
+  for (const cat in porCat) {
+    produtosDiv.innerHTML += `<div class="categoria"><h2>${cat}</h2></div>`;
+
+    porCat[cat].forEach(p => {
+      const id = p.nome.replace(/\W/g,"");
+      produtosDiv.innerHTML += `
+        <div class="produto">
+          <b>${p.nome}</b><br>
+          R$ ${p.preco.toFixed(2)}
+          <div class="controle">
+            <button onclick="remover('${p.nome}')">−</button>
+            <span id="qtd-${id}">0</span>
+            <button onclick="adicionar('${p.nome}', ${p.preco})">+</button>
+          </div>
+        </div>`;
     });
   }
 }
 
-function adicionar(nome,preco){
-  carrinho[nome]=carrinho[nome]||{qtd:0,preco};
+function adicionar(nome, preco) {
+  carrinho[nome] = carrinho[nome] || { qtd: 0, preco };
   carrinho[nome].qtd++;
   atualizar();
 }
 
-function remover(nome){
-  if(!carrinho[nome])return;
+function remover(nome) {
+  if (!carrinho[nome]) return;
   carrinho[nome].qtd--;
-  if(carrinho[nome].qtd<=0) delete carrinho[nome];
+  if (carrinho[nome].qtd <= 0) delete carrinho[nome];
   atualizar();
 }
 
-function atualizar(){
-  let q=0,t=0;
-  document.querySelectorAll('[id^="qtd-"]').forEach(e=>e.innerText=0);
+function atualizar() {
+  let q = 0, t = 0;
 
-  for(const i in carrinho){
-    q+=carrinho[i].qtd;
-    t+=carrinho[i].qtd*carrinho[i].preco;
-    const s=document.getElementById("qtd-"+i.replace(/\W/g,""));
-    if(s) s.innerText=carrinho[i].qtd;
+  document.querySelectorAll('[id^="qtd-"]').forEach(e => e.innerText = "0");
+
+  for (const i in carrinho) {
+    q += carrinho[i].qtd;
+    t += carrinho[i].qtd * carrinho[i].preco;
+    const s = document.getElementById("qtd-" + i.replace(/\W/g,""));
+    if (s) s.innerText = carrinho[i].qtd;
   }
 
-  qtdCarrinho.innerText=q;
-  totalCarrinho.innerText="R$ "+t.toFixed(2);
+  qtdCarrinho.innerText = q;
+  totalCarrinho.innerText = "R$ " + t.toFixed(2);
 }
 
-function abrirCarrinho(){ carrinhoDiv.style.display="block"; }
-function fecharCarrinho(){ carrinhoDiv.style.display="none"; }
+function abrirCarrinho() {
+  carrinhoDiv.style.display = "block";
+  listaCarrinho.innerHTML = "";
+  let t = 0;
 
-function filtrarProdutos(){
-  const t=busca.value.toLowerCase();
-  const c=filtroCategoria.value;
-  renderizarProdutos(produtos.filter(p =>
-    p.nome.toLowerCase().includes(t) &&
-    (!c || p.categoria===c)
-  ));
+  for (const i in carrinho) {
+    const sub = carrinho[i].qtd * carrinho[i].preco;
+    t += sub;
+    listaCarrinho.innerHTML += `${i} x${carrinho[i].qtd} = R$ ${sub.toFixed(2)}<br>`;
+  }
+
+  totalFinal.innerText = "TOTAL: R$ " + t.toFixed(2);
+}
+
+function fecharCarrinho() {
+  carrinhoDiv.style.display = "none";
+}
+
+function finalizarPedido() {
+  let tipo = prompt("Entrega ou Retirada?").toLowerCase();
+  let entrega = tipo.includes("entrega") || tipo === "1";
+
+  let endereco = "";
+  if (entrega) {
+    endereco = prompt("Informe o endereço completo:");
+    if (!endereco) return;
+    alert("⚠️ Cobramos taxa por KM. Valor informado no WhatsApp.");
+  }
+
+  let pagamento = prompt("Forma de pagamento: Débito, Crédito, Vale ou Pix");
+  if (!pagamento) return;
+
+  let msg = "🛒 Pedido Carnivorous%0A%0A";
+  let total = 0;
+
+  for (const i in carrinho) {
+    const sub = carrinho[i].qtd * carrinho[i].preco;
+    total += sub;
+    msg += `${i}%0AQtd: ${carrinho[i].qtd}%0ASubtotal: R$ ${sub.toFixed(2)}%0A%0A`;
+  }
+
+  msg += `TOTAL: R$ ${total.toFixed(2)}%0A`;
+  msg += entrega ? `📍 Endereço: ${endereco}%0A` : "🏪 Retirada no local%0A";
+  msg += `💳 Pagamento: ${pagamento}`;
+
+  window.open(`https://wa.me/5511999562721?text=${msg}`);
+}
+
+function filtrarProdutos() {
+  const t = busca.value.toLowerCase();
+  const c = filtroCategoria.value;
+
+  renderizarProdutos(
+    listaProdutos.filter(p =>
+      p.nome.toLowerCase().includes(t) &&
+      (!c || p.categoria === c)
+    )
+  );
 }
 </script>
 
