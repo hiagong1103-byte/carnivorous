@@ -14,28 +14,41 @@ body {
   color: #fff;
 }
 
+/* ===== HEADER ===== */
 header {
   display: flex;
   align-items: center;
-  gap: 15px;
-  padding: 15px;
-  background: #111;
+  gap: 20px;
+  padding: 20px;
+  background: #000;
+  border-bottom: 2px solid #111;
 }
 
-header img { height: 70px; }
+header img.logo {
+  height: 70px;
+}
 
 header h1 {
-  font-size: 48px;
+  font-size: 42px;
   margin: 0;
-  flex: 1;
+  white-space: nowrap;
 }
 
+/* imagem da família */
+.familia {
+  height: 110px;
+  object-fit: contain;
+  background: #000;
+}
+
+/* busca e filtro */
 header input, header select {
   padding: 8px;
   border-radius: 6px;
   border: none;
 }
 
+/* ===== PRODUTOS ===== */
 #produtos { padding: 20px; }
 
 .categoria { margin-top: 30px; }
@@ -55,6 +68,7 @@ header input, header select {
   font-size: 18px;
 }
 
+/* ===== CARRINHO ===== */
 #botaoCarrinho {
   position: fixed;
   bottom: 20px;
@@ -82,8 +96,14 @@ header input, header select {
 <body>
 
 <header>
-  <img src="logo.png">
+  <img src="logo.png" class="logo" alt="Logo Carnivorous">
+
   <h1>CARNIVOROUS</h1>
+
+  <!-- IMAGEM DA FAMÍLIA -->
+  <img src="assets/familia-carnivorous.png"
+       alt="Família Carnivorous"
+       class="familia">
 
   <input id="busca" placeholder="Buscar produto..." onkeyup="filtrarProdutos()">
 
@@ -120,10 +140,8 @@ const carrinho = {};
 function formatarUnidade(unidade) {
   if (!unidade) return "";
   const u = unidade.toLowerCase();
-
   if (u.includes("kilo") || u.includes("kg")) return "Kg";
   if (u.includes("un")) return "Unidade";
-
   return unidade;
 }
 
@@ -132,7 +150,6 @@ Papa.parse(PLANILHA, {
   header: true,
   skipEmptyLines: true,
   complete: function(res) {
-
     listaProdutos = res.data.map(l => ({
       nome: l["Descrição do Produto"],
       categoria: l["Categoria"],
@@ -186,6 +203,7 @@ function renderizarProdutos(lista = listaProdutos) {
   }
 }
 
+/* carrinho */
 function adicionar(nome, preco) {
   carrinho[nome] = carrinho[nome] || { qtd: 0, preco };
   carrinho[nome].qtd++;
@@ -201,7 +219,6 @@ function remover(nome) {
 
 function atualizar() {
   let q = 0, t = 0;
-
   document.querySelectorAll('[id^="qtd-"]').forEach(e => e.innerText = "0");
 
   for (const i in carrinho) {
@@ -215,60 +232,12 @@ function atualizar() {
   totalCarrinho.innerText = "R$ " + t.toFixed(2);
 }
 
-function abrirCarrinho() {
-  carrinhoDiv.style.display = "block";
-  listaCarrinho.innerHTML = "";
-  let t = 0;
-
-  for (const i in carrinho) {
-    const sub = carrinho[i].qtd * carrinho[i].preco;
-    t += sub;
-    listaCarrinho.innerHTML += `${i} x${carrinho[i].qtd} = R$ ${sub.toFixed(2)}<br>`;
-  }
-
-  totalFinal.innerText = "TOTAL: R$ " + t.toFixed(2);
-}
-
-function fecharCarrinho() {
-  carrinhoDiv.style.display = "none";
-}
-
-function finalizarPedido() {
-  let tipo = prompt("Entrega ou Retirada?");
-  if (!tipo) return;
-
-  let entrega = tipo.toLowerCase().includes("entrega");
-  let endereco = "";
-
-  if (entrega) {
-    endereco = prompt("Informe o endereço completo:");
-    if (!endereco) return;
-    alert("⚠️ Cobramos taxa por KM. Valor informado no WhatsApp.");
-  }
-
-  let pagamento = prompt("Forma de pagamento: Débito, Crédito, Vale ou Pix");
-  if (!pagamento) return;
-
-  let msg = "🛒 Pedido Carnivorous%0A%0A";
-  let total = 0;
-
-  for (const i in carrinho) {
-    const sub = carrinho[i].qtd * carrinho[i].preco;
-    total += sub;
-    msg += `${i}%0AQtd: ${carrinho[i].qtd}%0ASubtotal: R$ ${sub.toFixed(2)}%0A%0A`;
-  }
-
-  msg += `TOTAL: R$ ${total.toFixed(2)}%0A`;
-  msg += entrega ? `📍 Endereço: ${endereco}%0A` : "🏪 Retirada no local%0A";
-  msg += `💳 Pagamento: ${pagamento}`;
-
-  window.open(`https://wa.me/5511999562721?text=${msg}`);
-}
+function abrirCarrinho() { carrinhoDiv.style.display = "block"; }
+function fecharCarrinho() { carrinhoDiv.style.display = "none"; }
 
 function filtrarProdutos() {
   const t = busca.value.toLowerCase();
   const c = filtroCategoria.value;
-
   renderizarProdutos(
     listaProdutos.filter(p =>
       p.nome.toLowerCase().includes(t) &&
