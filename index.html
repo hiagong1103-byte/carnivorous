@@ -4,65 +4,222 @@
 <meta charset="UTF-8">
 <title>Carnivorous</title>
 
+<!-- PapaParse -->
 <script src="https://cdn.jsdelivr.net/npm/papaparse@5.4.1/papaparse.min.js"></script>
-<script src="https://maps.googleapis.com/maps/api/js?key=AIzaSyAR8CwWiIzxPP1Ly2LVWpbXRQYzUzi-JhY"></script>
+
+<!-- Google Maps (CORRETO) -->
+<script src="https://maps.googleapis.com/maps/api/js?key=AIzaSyAR8CwWiIzxPP1Ly2LVWpbXRQYzUzi-JhY&libraries=places"></script>
 
 <style>
-body {
-  margin: 0;
-  font-family: Arial, sans-serif;
-  background: #000;
-  color: #fff;
-}
-header {
-  padding: 20px;
-  border-bottom: 2px solid #111;
-}
-header input, header select {
-  padding: 8px;
-  border-radius: 6px;
-  border: none;
-}
-#produtos { padding: 20px; }
-.categoria h2 { border-bottom: 2px solid #333; }
-.produto { border-bottom: 1px solid #222; padding: 10px 0; }
+body { margin:0; font-family:Arial; background:#000; color:#fff; }
+header { padding:20px; border-bottom:2px solid #111; }
+header input, header select { padding:8px; border-radius:6px; border:none; }
+#produtos { padding:20px; }
+.categoria h2 { border-bottom:2px solid #333; }
+.produto { border-bottom:1px solid #222; padding:10px 0; }
 .controle button {
-  background: #ffcc00;
-  color: #000;
-  font-weight: bold;
-  border: none;
-  border-radius: 6px;
-  padding: 4px 12px;
-  font-size: 18px;
-  cursor: pointer;
+  background:#ffcc00; color:#000; font-weight:bold;
+  border:none; border-radius:6px; padding:4px 12px;
+  font-size:18px; cursor:pointer;
 }
 #botaoCarrinho {
-  position: fixed;
-  bottom: 20px;
-  right: 20px;
-  background: #25d366;
-  color: #000;
-  padding: 15px;
-  border-radius: 14px;
-  cursor: pointer;
-  font-weight: bold;
+  position:fixed; bottom:20px; right:20px;
+  background:#25d366; color:#000; padding:15px;
+  border-radius:14px; cursor:pointer; font-weight:bold;
 }
 #carrinho {
-  display: none;
-  position: fixed;
-  inset: 0;
-  background: #000;
-  padding: 20px;
-  overflow: auto;
+  display:none; position:fixed; inset:0;
+  background:#000; padding:20px; overflow:auto;
 }
 #carrinho button {
-  width: 100%;
-  margin-top: 10px;
-  padding: 12px;
-  font-size: 16px;
-  font-weight: bold;
-  border-radius: 8px;
-  border: none;
-  cursor: pointer;
+  width:100%; margin-top:10px; padding:12px;
+  font-size:16px; font-weight:bold; border-radius:8px;
+  border:none; cursor:pointer;
 }
-.amarelo { background: #ff
+.amarelo{background:#ffcc00;color:#000}
+.verde{background:#25d366;color:#000}
+.cinza{background:#333;color:#fff}
+input[type=text]{width:100%;padding:10px;margin-top:10px;border-radius:6px;border:none}
+</style>
+</head>
+
+<body>
+
+<header>
+  <h1>CARNIVOROUS</h1>
+  <input id="busca" placeholder="Buscar..." onkeyup="filtrarProdutos()">
+  <select id="filtroCategoria" onchange="filtrarProdutos()"></select>
+</header>
+
+<div id="produtos"></div>
+
+<div id="botaoCarrinho" onclick="abrirCarrinho()">
+🛒 <span id="qtdCarrinho">0</span><br>
+<span id="totalCarrinho">R$ 0,00</span>
+</div>
+
+<div id="carrinho">
+  <h2>Carrinho</h2>
+  <div id="conteudoCarrinho"></div>
+  <button class="amarelo" onclick="escolherEntrega()">Finalizar pedido</button>
+  <button class="cinza" onclick="fecharCarrinho()">Fechar</button>
+</div>
+
+<script>
+/* ===== CONFIG ===== */
+const PLANILHA =
+"https://docs.google.com/spreadsheets/d/15osZ7x4v43t8yFdOs90W4oQnHdY-CJvF3qnTEz1SKjQ/pub?output=csv";
+
+const ENDERECO_LOJA = "Rua David Ben Gurion, 1074, Jardim Monte Kemel, São Paulo - SP";
+const TAXA_POR_KM = 5;
+const WHATSAPP_LOJA = "5511999562721";
+
+/* ===== ELEMENTOS ===== */
+const produtosDiv = document.getElementById("produtos");
+const carrinhoDiv = document.getElementById("carrinho");
+const conteudoCarrinho = document.getElementById("conteudoCarrinho");
+const qtdCarrinho = document.getElementById("qtdCarrinho");
+const totalCarrinho = document.getElementById("totalCarrinho");
+const filtroCategoria = document.getElementById("filtroCategoria");
+const busca = document.getElementById("busca");
+
+/* ===== DADOS ===== */
+let listaProdutos = [];
+let carrinho = {};
+let totalProdutos = 0;
+
+/* ===== PRODUTOS (NÃO DEPENDE DO MAPS) ===== */
+Papa.parse(PLANILHA, {
+  download:true,
+  header:true,
+  skipEmptyLines:true,
+  complete: res => {
+    listaProdutos = res.data.map(l => {
+      const nome = l["Descrição do Produto"] || l["Produto"] || l["Nome"];
+      const categoria = l["Categoria"] || "Outros";
+      const valor = l["Valor Venda"] || l["Preço"];
+      if(!nome||!valor) return null;
+      return {
+        nome:nome.trim(),
+        categoria:categoria.trim(),
+        preco:Number(String(valor).replace(/\./g,"").replace(",","."))
+      };
+    }).filter(p=>p&&!isNaN(p.preco));
+    carregarCategorias();
+    renderizarProdutos();
+  }
+});
+
+/* ===== UI ===== */
+function carregarCategorias(){
+  filtroCategoria.innerHTML=`<option value="">Categorias</option>`;
+  [...new Set(listaProdutos.map(p=>p.categoria))].forEach(c=>{
+    filtroCategoria.innerHTML+=`<option>${c}</option>`;
+  });
+}
+
+function renderizarProdutos(lista=listaProdutos){
+  produtosDiv.innerHTML="";
+  const g={};
+  lista.forEach(p=>(g[p.categoria]=g[p.categoria]||[]).push(p));
+  for(let c in g){
+    produtosDiv.innerHTML+=`<div class="categoria"><h2>${c}</h2></div>`;
+    g[c].forEach(p=>{
+      const id=p.nome.replace(/\W/g,"");
+      produtosDiv.innerHTML+=`
+      <div class="produto">
+        <b>${p.nome}</b><br>R$ ${p.preco.toFixed(2)}
+        <div class="controle">
+          <button onclick="remover('${p.nome}')">−</button>
+          <span id="qtd-${id}">0</span>
+          <button onclick="adicionar('${p.nome}',${p.preco})">+</button>
+        </div>
+      </div>`;
+    });
+  }
+}
+
+function adicionar(n,p){ carrinho[n]=carrinho[n]||{qtd:0,preco:p}; carrinho[n].qtd++; atualizar();}
+function remover(n){ if(!carrinho[n])return; carrinho[n].qtd--; if(carrinho[n].qtd<=0)delete carrinho[n]; atualizar();}
+
+function atualizar(){
+  let q=0,t=0;
+  document.querySelectorAll('[id^="qtd-"]').forEach(e=>e.innerText="0");
+  for(let i in carrinho){
+    q+=carrinho[i].qtd;
+    t+=carrinho[i].qtd*carrinho[i].preco;
+    const el=document.getElementById("qtd-"+i.replace(/\W/g,""));
+    if(el)el.innerText=carrinho[i].qtd;
+  }
+  qtdCarrinho.innerText=q;
+  totalCarrinho.innerText="R$ "+t.toFixed(2);
+  totalProdutos=t;
+}
+
+/* ===== ENTREGA ===== */
+function abrirCarrinho(){
+  let h="";
+  for(let i in carrinho){
+    h+=`${carrinho[i].qtd}x <b>${i}</b> - R$ ${(carrinho[i].qtd*carrinho[i].preco).toFixed(2)}<br>`;
+  }
+  h+=`<hr><b>Total: R$ ${totalProdutos.toFixed(2)}</b>`;
+  conteudoCarrinho.innerHTML=h;
+  carrinhoDiv.style.display="block";
+}
+function fecharCarrinho(){ carrinhoDiv.style.display="none"; }
+
+function escolherEntrega(){
+  conteudoCarrinho.innerHTML=`
+  <h3>Entrega ou Retirada?</h3>
+  <button class="verde" onclick="pedirEndereco()">Entrega</button>
+  <button class="amarelo" onclick="enviarWhats('Retirada',0,'')">Retirada</button>`;
+}
+
+function pedirEndereco(){
+  conteudoCarrinho.innerHTML=`
+  <h3>Endereço</h3>
+  <input id="enderecoCliente" type="text">
+  <button class="verde" onclick="calcularEntrega()">Calcular taxa</button>`;
+}
+
+function calcularEntrega(){
+  const end=document.getElementById("enderecoCliente").value;
+  const svc=new google.maps.DistanceMatrixService();
+  svc.getDistanceMatrix({
+    origins:[ENDERECO_LOJA],
+    destinations:[end],
+    travelMode:'DRIVING'
+  },(r,s)=>{
+    if(s!=="OK"){alert("Erro no Maps");return;}
+    const km=r.rows[0].elements[0].distance.value/1000;
+    const taxa=km*TAXA_POR_KM;
+    conteudoCarrinho.innerHTML=`
+      Distância: ${km.toFixed(2)} km<br>
+      Taxa: R$ ${taxa.toFixed(2)}<br>
+      <b>Total: R$ ${(totalProdutos+taxa).toFixed(2)}</b>
+      <button class="verde" onclick="enviarWhats('Entrega',${taxa},'${end}')">Confirmar</button>`;
+  });
+}
+
+function enviarWhats(tipo,taxa,end){
+  let m="Pedido:%0A";
+  for(let i in carrinho){
+    m+=`${carrinho[i].qtd}x ${i} - R$ ${(carrinho[i].qtd*carrinho[i].preco).toFixed(2)}%0A`;
+  }
+  m+=`%0ATotal produtos: R$ ${totalProdutos.toFixed(2)}`;
+  if(tipo==="Entrega"){m+=`%0ATaxa: R$ ${taxa.toFixed(2)}%0AEndereço: ${end}`;}
+  m+=`%0ATotal final: R$ ${(totalProdutos+taxa).toFixed(2)}`;
+  window.open(`https://wa.me/${WHATSAPP_LOJA}?text=${m}`,"_blank");
+}
+
+function filtrarProdutos(){
+  const t=busca.value.toLowerCase();
+  const c=filtroCategoria.value;
+  renderizarProdutos(listaProdutos.filter(p=>
+    p.nome.toLowerCase().includes(t)&&(!c||p.categoria===c)
+  ));
+}
+</script>
+
+</body>
+</html>
