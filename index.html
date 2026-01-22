@@ -4,11 +4,7 @@
 <meta charset="UTF-8">
 <title>Carnivorous</title>
 
-<!-- CSV -->
 <script src="https://cdn.jsdelivr.net/npm/papaparse@5.4.1/papaparse.min.js"></script>
-
-<!-- Google Maps -->
-<script src="https://maps.googleapis.com/maps/api/js?key=AIzaSyAR8CwWiIzxPP1Ly2LVWpbXRQYzUzi-JhY"></script>
 
 <style>
 body {
@@ -19,16 +15,19 @@ body {
 }
 
 header {
-  padding: 20px;
-  border-bottom: 2px solid #111;
   display: flex;
-  flex-wrap: wrap;
-  gap: 10px;
+  align-items: center;
+  gap: 15px;
+  padding: 15px;
+  background: #111;
 }
 
+header img { height: 70px; }
+
 header h1 {
-  width: 100%;
+  font-size: 48px;
   margin: 0;
+  flex: 1;
 }
 
 header input, header select {
@@ -39,28 +38,21 @@ header input, header select {
 
 #produtos { padding: 20px; }
 
-.categoria {
-  margin-top: 30px;
-}
+.categoria { margin-top: 30px; }
 
 .categoria h2 {
   border-bottom: 2px solid #333;
+  padding-bottom: 5px;
 }
 
 .produto {
+  padding: 12px 0;
   border-bottom: 1px solid #222;
-  padding: 10px 0;
 }
 
 .controle button {
-  background: #ffcc00;
-  color: #000;
-  font-weight: bold;
-  border: none;
-  border-radius: 6px;
   padding: 4px 12px;
   font-size: 18px;
-  cursor: pointer;
 }
 
 #botaoCarrinho {
@@ -84,38 +76,20 @@ header input, header select {
   padding: 20px;
   overflow: auto;
 }
-
-#carrinho button {
-  width: 100%;
-  margin-top: 10px;
-  padding: 12px;
-  font-size: 16px;
-  font-weight: bold;
-  border-radius: 8px;
-  border: none;
-  cursor: pointer;
-}
-
-.amarelo { background: #ffcc00; color: #000; }
-.verde { background: #25d366; color: #000; }
-.cinza { background: #333; color: #fff; }
-
-input[type="text"] {
-  width: 100%;
-  padding: 10px;
-  margin-top: 10px;
-  border-radius: 6px;
-  border: none;
-}
 </style>
 </head>
 
 <body>
 
 <header>
+  <img src="logo.png">
   <h1>CARNIVOROUS</h1>
+
   <input id="busca" placeholder="Buscar produto..." onkeyup="filtrarProdutos()">
-  <select id="filtroCategoria" onchange="filtrarProdutos()"></select>
+
+  <select id="filtroCategoria" onchange="filtrarProdutos()">
+    <option value="">Categorias</option>
+  </select>
 </header>
 
 <div id="produtos"></div>
@@ -126,110 +100,88 @@ input[type="text"] {
 </div>
 
 <div id="carrinho">
-  <h2>Carrinho</h2>
-  <div id="conteudoCarrinho"></div>
-  <button class="amarelo" onclick="escolherEntrega()">Finalizar pedido</button>
-  <button class="cinza" onclick="fecharCarrinho()">Fechar</button>
+<h2>Carrinho</h2>
+<div id="listaCarrinho"></div>
+<h3 id="totalFinal"></h3>
+<button onclick="finalizarPedido()">Finalizar no WhatsApp</button>
+<button onclick="fecharCarrinho()">Fechar</button>
 </div>
 
 <script>
-/* ===== ELEMENTOS ===== */
+const PLANILHA =
+"https://docs.google.com/spreadsheets/d/e/2PACX-1vTsqDIhOoTibb56-QuExYbR9PfD1Fbu4y5x1a9k3X5BcLdl3rRA7tGmCQNI_Gn-uAlkYdUr1FtMigyA/pub?output=csv";
+
 const produtosDiv = document.getElementById("produtos");
 const carrinhoDiv = document.getElementById("carrinho");
-const conteudoCarrinho = document.getElementById("conteudoCarrinho");
-const qtdCarrinho = document.getElementById("qtdCarrinho");
-const totalCarrinho = document.getElementById("totalCarrinho");
-const filtroCategoria = document.getElementById("filtroCategoria");
-const busca = document.getElementById("busca");
 
-/* ===== CONFIG ===== */
-const PLANILHA =
-"https://docs.google.com/spreadsheets/d/15osZ7x4v43t8yFdOs90W4oQnHdY-CJvF3qnTEz1SKjQ/pub?output=csv";
-
-const ENDERECO_LOJA = "Rua David Ben Gurion, 1074, Jardim Monte Kemel, São Paulo - SP";
-const TAXA_POR_KM = 5;
-const WHATSAPP_LOJA = "5511999562721";
-
-/* ===== DADOS ===== */
 let listaProdutos = [];
-let carrinho = {};
-let totalProdutos = 0;
+const carrinho = {};
 
-/* ===== CARREGAR PRODUTOS (ROBUSTO) ===== */
+function formatarUnidade(unidade) {
+  if (!unidade) return "";
+  const u = unidade.toLowerCase();
+
+  if (u.includes("kilo") || u.includes("kg")) return "Kg";
+  if (u.includes("un")) return "Unidade";
+
+  return unidade;
+}
+
 Papa.parse(PLANILHA, {
   download: true,
   header: true,
   skipEmptyLines: true,
   complete: function(res) {
 
-    listaProdutos = res.data.map(l => {
-      const nome =
-        l["Descrição do Produto"] ||
-        l["Descricao do Produto"] ||
-        l["Produto"] ||
-        l["Nome"];
-
-      const categoria =
-        l["Categoria"] ||
-        "Outros";
-
-      const valor =
-        l["Valor Venda"] ||
-        l["Valor de Venda"] ||
-        l["Preço"] ||
-        l["Preco"];
-
-      if (!nome || !valor) return null;
-
-      return {
-        nome: nome.trim(),
-        categoria: categoria.trim(),
-        preco: Number(
-          String(valor)
-            .replace("R$", "")
-            .replace(/\./g, "")
-            .replace(",", ".")
-        )
-      };
-    }).filter(p => p && !isNaN(p.preco));
+    listaProdutos = res.data.map(l => ({
+      nome: l["Descrição do Produto"],
+      categoria: l["Categoria"],
+      unidade: l["Unidade de Venda"],
+      preco: Number(
+        String(l["Valor Venda"])
+          .replace("R$", "")
+          .replace(/\./g, "")
+          .replace(",", ".")
+      )
+    })).filter(p => p.nome && p.categoria && p.preco && p.unidade);
 
     carregarCategorias();
     renderizarProdutos();
   }
 });
 
-/* ===== FUNÇÕES ===== */
 function carregarCategorias() {
+  const cats = [...new Set(listaProdutos.map(p => p.categoria))];
   filtroCategoria.innerHTML = `<option value="">Categorias</option>`;
-  [...new Set(listaProdutos.map(p => p.categoria))].forEach(c => {
+  cats.forEach(c => {
     filtroCategoria.innerHTML += `<option value="${c}">${c}</option>`;
   });
 }
 
 function renderizarProdutos(lista = listaProdutos) {
   produtosDiv.innerHTML = "";
-  const grupos = {};
+  const porCat = {};
 
   lista.forEach(p => {
-    grupos[p.categoria] = grupos[p.categoria] || [];
-    grupos[p.categoria].push(p);
+    porCat[p.categoria] = porCat[p.categoria] || [];
+    porCat[p.categoria].push(p);
   });
 
-  for (let cat in grupos) {
+  for (const cat in porCat) {
     produtosDiv.innerHTML += `<div class="categoria"><h2>${cat}</h2></div>`;
-    grupos[cat].forEach(p => {
+
+    porCat[cat].forEach(p => {
       const id = p.nome.replace(/\W/g,"");
       produtosDiv.innerHTML += `
         <div class="produto">
           <b>${p.nome}</b><br>
-          R$ ${p.preco.toFixed(2)}
+          R$ ${p.preco.toFixed(2)} / ${formatarUnidade(p.unidade)}
           <div class="controle">
             <button onclick="remover('${p.nome}')">−</button>
             <span id="qtd-${id}">0</span>
             <button onclick="adicionar('${p.nome}', ${p.preco})">+</button>
           </div>
-        </div>
-      `;
+        </div>`;
     });
   }
 }
@@ -237,114 +189,90 @@ function renderizarProdutos(lista = listaProdutos) {
 function adicionar(nome, preco) {
   carrinho[nome] = carrinho[nome] || { qtd: 0, preco };
   carrinho[nome].qtd++;
-  atualizarCarrinho();
+  atualizar();
 }
 
 function remover(nome) {
   if (!carrinho[nome]) return;
   carrinho[nome].qtd--;
   if (carrinho[nome].qtd <= 0) delete carrinho[nome];
-  atualizarCarrinho();
+  atualizar();
 }
 
-function atualizarCarrinho() {
-  let qtd = 0;
-  let total = 0;
+function atualizar() {
+  let q = 0, t = 0;
 
   document.querySelectorAll('[id^="qtd-"]').forEach(e => e.innerText = "0");
 
-  for (let i in carrinho) {
-    qtd += carrinho[i].qtd;
-    total += carrinho[i].qtd * carrinho[i].preco;
-    const el = document.getElementById("qtd-" + i.replace(/\W/g,""));
-    if (el) el.innerText = carrinho[i].qtd;
+  for (const i in carrinho) {
+    q += carrinho[i].qtd;
+    t += carrinho[i].qtd * carrinho[i].preco;
+    const s = document.getElementById("qtd-" + i.replace(/\W/g,""));
+    if (s) s.innerText = carrinho[i].qtd;
   }
 
-  qtdCarrinho.innerText = qtd;
-  totalCarrinho.innerText = "R$ " + total.toFixed(2);
-  totalProdutos = total;
+  qtdCarrinho.innerText = q;
+  totalCarrinho.innerText = "R$ " + t.toFixed(2);
 }
 
-/* ===== FLUXO ENTREGA ===== */
 function abrirCarrinho() {
-  let html = "";
-  for (let i in carrinho) {
-    const sub = carrinho[i].qtd * carrinho[i].preco;
-    html += `${carrinho[i].qtd}x <b>${i}</b> — R$ ${sub.toFixed(2)}<br>`;
-  }
-  html += `<hr><b>Total produtos: R$ ${totalProdutos.toFixed(2)}</b>`;
-  conteudoCarrinho.innerHTML = html;
   carrinhoDiv.style.display = "block";
+  listaCarrinho.innerHTML = "";
+  let t = 0;
+
+  for (const i in carrinho) {
+    const sub = carrinho[i].qtd * carrinho[i].preco;
+    t += sub;
+    listaCarrinho.innerHTML += `${i} x${carrinho[i].qtd} = R$ ${sub.toFixed(2)}<br>`;
+  }
+
+  totalFinal.innerText = "TOTAL: R$ " + t.toFixed(2);
 }
 
 function fecharCarrinho() {
   carrinhoDiv.style.display = "none";
 }
 
-function escolherEntrega() {
-  conteudoCarrinho.innerHTML = `
-    <h3>Entrega ou Retirada?</h3>
-    <button class="verde" onclick="pedirEndereco()">Entrega</button>
-    <button class="amarelo" onclick="finalizarWhats('Retirada',0,'')">Retirada</button>
-  `;
-}
+function finalizarPedido() {
+  let tipo = prompt("Entrega ou Retirada?");
+  if (!tipo) return;
 
-function pedirEndereco() {
-  conteudoCarrinho.innerHTML = `
-    <h3>Endereço para entrega</h3>
-    <input type="text" id="enderecoCliente" placeholder="Digite o endereço completo">
-    <button class="verde" onclick="calcularEntrega()">Calcular taxa</button>
-  `;
-}
+  let entrega = tipo.toLowerCase().includes("entrega");
+  let endereco = "";
 
-function calcularEntrega() {
-  const endereco = document.getElementById("enderecoCliente").value;
-  const service = new google.maps.DistanceMatrixService();
+  if (entrega) {
+    endereco = prompt("Informe o endereço completo:");
+    if (!endereco) return;
+    alert("⚠️ Cobramos taxa por KM. Valor informado no WhatsApp.");
+  }
 
-  service.getDistanceMatrix({
-    origins: [ENDERECO_LOJA],
-    destinations: [endereco],
-    travelMode: 'DRIVING'
-  }, (res, status) => {
-    if (status !== "OK") {
-      alert("Erro ao calcular distância");
-      return;
-    }
+  let pagamento = prompt("Forma de pagamento: Débito, Crédito, Vale ou Pix");
+  if (!pagamento) return;
 
-    const km = res.rows[0].elements[0].distance.value / 1000;
-    const taxa = km * TAXA_POR_KM;
+  let msg = "🛒 Pedido Carnivorous%0A%0A";
+  let total = 0;
 
-    finalizarWhats("Entrega", taxa, endereco);
-  });
-}
-
-function finalizarWhats(tipo, taxa, endereco) {
-  let msg = "Pedido:%0A";
-  for (let i in carrinho) {
+  for (const i in carrinho) {
     const sub = carrinho[i].qtd * carrinho[i].preco;
-    msg += `${carrinho[i].qtd}x ${i} - R$ ${sub.toFixed(2)}%0A`;
+    total += sub;
+    msg += `${i}%0AQtd: ${carrinho[i].qtd}%0ASubtotal: R$ ${sub.toFixed(2)}%0A%0A`;
   }
 
-  msg += `%0ATotal produtos: R$ ${totalProdutos.toFixed(2)}`;
+  msg += `TOTAL: R$ ${total.toFixed(2)}%0A`;
+  msg += entrega ? `📍 Endereço: ${endereco}%0A` : "🏪 Retirada no local%0A";
+  msg += `💳 Pagamento: ${pagamento}`;
 
-  if (tipo === "Entrega") {
-    msg += `%0ATaxa entrega: R$ ${taxa.toFixed(2)}`;
-    msg += `%0AEndereço: ${endereco}`;
-  }
-
-  msg += `%0ATotal final: R$ ${(totalProdutos + taxa).toFixed(2)}`;
-
-  window.open(`https://wa.me/${WHATSAPP_LOJA}?text=${msg}`, "_blank");
+  window.open(`https://wa.me/5511999562721?text=${msg}`);
 }
 
 function filtrarProdutos() {
-  const texto = busca.value.toLowerCase();
-  const cat = filtroCategoria.value;
+  const t = busca.value.toLowerCase();
+  const c = filtroCategoria.value;
 
   renderizarProdutos(
     listaProdutos.filter(p =>
-      p.nome.toLowerCase().includes(texto) &&
-      (!cat || p.categoria === cat)
+      p.nome.toLowerCase().includes(t) &&
+      (!c || p.categoria === c)
     )
   );
 }
