@@ -3,93 +3,31 @@
 <head>
 <meta charset="UTF-8">
 <title>Carnivorous</title>
-
 <script src="https://cdn.jsdelivr.net/npm/papaparse@5.4.1/papaparse.min.js"></script>
 
 <style>
-body {
-  margin: 0;
-  font-family: Arial, sans-serif;
-  background: #000;
-  color: #fff;
-}
-
-header {
-  display: flex;
-  align-items: center;
-  gap: 15px;
-  padding: 15px;
-  background: #111;
-}
-
-header img { height: 70px; }
-
-header h1 {
-  font-size: 48px;
-  margin: 0;
-  flex: 1;
-}
-
-header input, header select {
-  padding: 8px;
-  border-radius: 6px;
-  border: none;
-}
-
-#produtos { padding: 20px; }
-
-.categoria { margin-top: 30px; }
-
-.categoria h2 {
-  border-bottom: 2px solid #333;
-  padding-bottom: 5px;
-}
-
-.produto {
-  padding: 12px 0;
-  border-bottom: 1px solid #222;
-}
-
-.controle button {
-  padding: 4px 12px;
-  font-size: 18px;
-}
-
-#botaoCarrinho {
-  position: fixed;
-  bottom: 20px;
-  right: 20px;
-  background: #25d366;
-  color: #000;
-  padding: 15px;
-  border-radius: 14px;
-  cursor: pointer;
-  font-weight: bold;
-  text-align: center;
-}
-
-#carrinho {
-  display: none;
-  position: fixed;
-  inset: 0;
-  background: #000;
-  padding: 20px;
-  overflow: auto;
-}
+body{margin:0;font-family:Arial;background:#000;color:#fff}
+header{display:flex;gap:15px;padding:15px;background:#111;align-items:center}
+header img{height:70px}
+header h1{font-size:42px;margin:0;flex:1}
+header input,header select{padding:8px;border-radius:6px;border:none}
+#produtos{padding:20px}
+.categoria{margin-top:30px}
+.categoria h2{border-bottom:2px solid #333}
+.produto{border-bottom:1px solid #222;padding:10px 0}
+.controle button{font-size:18px;padding:4px 12px}
+#botaoCarrinho{position:fixed;bottom:20px;right:20px;background:#25d366;color:#000;padding:15px;border-radius:14px;font-weight:bold;cursor:pointer}
+#carrinho{display:none;position:fixed;inset:0;background:#000;padding:20px;overflow:auto}
 </style>
 </head>
 
 <body>
 
 <header>
-  <img src="logo.png">
-  <h1>CARNIVOROUS</h1>
-
-  <input id="busca" placeholder="Buscar produto..." onkeyup="filtrarProdutos()">
-
-  <select id="filtroCategoria" onchange="filtrarProdutos()">
-    <option value="">Categorias</option>
-  </select>
+<img src="logo.png">
+<h1>CARNIVOROUS</h1>
+<input id="busca" placeholder="Buscar..." onkeyup="filtrar()">
+<select id="filtro" onchange="filtrar()"><option value="">Categorias</option></select>
 </header>
 
 <div id="produtos"></div>
@@ -103,170 +41,145 @@ header input, header select {
 <h2>Carrinho</h2>
 <div id="listaCarrinho"></div>
 <h3 id="totalFinal"></h3>
-<button onclick="finalizarPedido()">Finalizar no WhatsApp</button>
+<button onclick="finalizar()">Finalizar</button>
 <button onclick="fecharCarrinho()">Fechar</button>
 </div>
 
 <script>
 const PLANILHA =
-"https://docs.google.com/spreadsheets/d/e/2PACX-1vTsqDIhOoTibb56-QuExYbR9PfD1Fbu4y5x1a9k3X5BcLdl3rRA7tGmCQNI_Gn-uAlkYdUr1FtMigyA/pub?output=csv";
+"https://docs.google.com/spreadsheets/d/e/2PACX-1vTsqDIhOoTibb56-QuExYbR9PfD1Fbu4y5x1a9k3X5BcLdl3rRA7tGmCQNI_Gn-uAlkYdUr1FtMigyA/pub?output=csv&gid=0";
 
-const produtosDiv = document.getElementById("produtos");
-const carrinhoDiv = document.getElementById("carrinho");
-
-let listaProdutos = [];
+let produtos = [];
 const carrinho = {};
 
-Papa.parse(PLANILHA, {
-  download: true,
-  header: true,
-  skipEmptyLines: true,
-  complete: function(res) {
+Papa.parse(PLANILHA,{
+  download:true,
+  header:true,
+  skipEmptyLines:true,
+  complete:r=>{
+    console.log("CSV BRUTO:", r.data);
 
-    listaProdutos = res.data
-      .map(l => {
-        const codigo = (l["Código"] || "").toString().trim();
-        const nome = (l["Descrição do Produto"] || "").trim();
-        const categoria = (l["Categoria"] || "").trim();
-        const unidade = (l["Unidade de Venda"] || "").trim();
+    produtos = r.data.filter(l=>{
+      const codigo = (l["Código"]||"").trim();
+      const nome = (l["Descrição do Produto"]||"").trim();
+      const cat = (l["Categoria"]||"").trim();
+      const un = (l["Unidade de Venda"]||"").trim();
+      const preco = parseFloat(
+        String(l["Valor Venda"]||"")
+          .replace("R$","")
+          .replace(/\./g,"")
+          .replace(",",".")
+      );
 
-        const preco = parseFloat(
-          String(l["Valor Venda"] || "")
-            .replace("R$", "")
-            .replace(/\./g, "")
-            .replace(",", ".")
-        );
+      return (
+        /^[0-9]+$/.test(codigo) &&
+        nome.length > 2 &&
+        cat &&
+        un &&
+        !isNaN(preco) &&
+        preco > 0
+      );
+    }).map(l=>({
+      codigo:l["Código"],
+      nome:l["Descrição do Produto"],
+      categoria:l["Categoria"],
+      unidade:l["Unidade de Venda"],
+      preco:parseFloat(
+        String(l["Valor Venda"])
+        .replace("R$","")
+        .replace(/\./g,"")
+        .replace(",",".")
+      )
+    }));
 
-        return { codigo, nome, categoria, unidade, preco };
-      })
-      .filter(p => {
-        if (!p.codigo || isNaN(p.codigo)) return false;
-        if (!p.nome || !p.categoria || !p.unidade) return false;
-        if (isNaN(p.preco) || p.preco <= 0) return false;
-
-        const n = p.nome.toLowerCase();
-        if (
-          n.includes("total") ||
-          n.includes("subtotal") ||
-          n.includes("categoria")
-        ) return false;
-
-        return true;
-      });
+    console.log("PRODUTOS FINAIS:", produtos);
 
     carregarCategorias();
-    renderizarProdutos();
+    renderizar(produtos);
   }
 });
 
-function carregarCategorias() {
-  const cats = [...new Set(listaProdutos.map(p => p.categoria))];
-  filtroCategoria.innerHTML = `<option value="">Categorias</option>`;
-  cats.forEach(c => {
-    filtroCategoria.innerHTML += `<option value="${c}">${c}</option>`;
+function carregarCategorias(){
+  const sel=document.getElementById("filtro");
+  [...new Set(produtos.map(p=>p.categoria))].forEach(c=>{
+    sel.innerHTML+=`<option>${c}</option>`;
   });
 }
 
-function renderizarProdutos(lista = listaProdutos) {
-  produtosDiv.innerHTML = "";
-  const porCat = {};
-
-  lista.forEach(p => {
-    porCat[p.categoria] = porCat[p.categoria] || [];
-    porCat[p.categoria].push(p);
+function renderizar(lista){
+  const div=document.getElementById("produtos");
+  div.innerHTML="";
+  const cats={};
+  lista.forEach(p=>{
+    cats[p.categoria]=cats[p.categoria]||[];
+    cats[p.categoria].push(p);
   });
 
-  for (const cat in porCat) {
-    produtosDiv.innerHTML += `<div class="categoria"><h2>${cat}</h2></div>`;
-
-    porCat[cat].forEach(p => {
-      const id = p.codigo;
-      produtosDiv.innerHTML += `
-        <div class="produto">
-          <b>${p.nome}</b><br>
-          R$ ${p.preco.toFixed(2)} / ${p.unidade}
-          <div class="controle">
-            <button onclick="remover('${p.codigo}')">−</button>
-            <span id="qtd-${id}">0</span>
-            <button onclick="adicionar('${p.codigo}', '${p.nome}', ${p.preco})">+</button>
-          </div>
-        </div>`;
+  for(const c in cats){
+    div.innerHTML+=`<div class="categoria"><h2>${c}</h2></div>`;
+    cats[c].forEach(p=>{
+      div.innerHTML+=`
+      <div class="produto">
+        <b>${p.nome}</b><br>
+        R$ ${p.preco.toFixed(2)} / ${p.unidade}<br>
+        <button onclick="add('${p.codigo}','${p.nome}',${p.preco})">+</button>
+        <span id="q${p.codigo}">0</span>
+        <button onclick="rem('${p.codigo}')">−</button>
+      </div>`;
     });
   }
 }
 
-function adicionar(codigo, nome, preco) {
-  carrinho[codigo] = carrinho[codigo] || { nome, qtd: 0, preco };
-  carrinho[codigo].qtd++;
-  atualizar();
+function add(c,n,p){
+  carrinho[c]=carrinho[c]||{nome:n,q:0,preco:p};
+  carrinho[c].q++;atualiza();
 }
-
-function remover(codigo) {
-  if (!carrinho[codigo]) return;
-  carrinho[codigo].qtd--;
-  if (carrinho[codigo].qtd <= 0) delete carrinho[codigo];
-  atualizar();
+function rem(c){
+  if(!carrinho[c])return;
+  carrinho[c].q--;if(carrinho[c].q<=0)delete carrinho[c];
+  atualiza();
 }
-
-function atualizar() {
-  let q = 0, t = 0;
-  document.querySelectorAll('[id^="qtd-"]').forEach(e => e.innerText = "0");
-
-  for (const i in carrinho) {
-    q += carrinho[i].qtd;
-    t += carrinho[i].qtd * carrinho[i].preco;
-    const s = document.getElementById("qtd-" + i);
-    if (s) s.innerText = carrinho[i].qtd;
+function atualiza(){
+  let q=0,t=0;
+  document.querySelectorAll('[id^="q"]').forEach(e=>e.innerText="0");
+  for(const c in carrinho){
+    q+=carrinho[c].q;
+    t+=carrinho[c].q*carrinho[c].preco;
+    document.getElementById("q"+c).innerText=carrinho[c].q;
   }
-
-  qtdCarrinho.innerText = q;
-  totalCarrinho.innerText = "R$ " + t.toFixed(2);
+  qtdCarrinho.innerText=q;
+  totalCarrinho.innerText="R$ "+t.toFixed(2);
 }
-
-function abrirCarrinho() {
-  carrinhoDiv.style.display = "block";
-  listaCarrinho.innerHTML = "";
-  let t = 0;
-
-  for (const i in carrinho) {
-    const sub = carrinho[i].qtd * carrinho[i].preco;
-    t += sub;
-    listaCarrinho.innerHTML += `${carrinho[i].nome} x${carrinho[i].qtd} = R$ ${sub.toFixed(2)}<br>`;
+function abrirCarrinho(){
+  carrinhoDiv.style.display="block";
+  listaCarrinho.innerHTML="";
+  let t=0;
+  for(const c in carrinho){
+    const s=carrinho[c].q*carrinho[c].preco;
+    t+=s;
+    listaCarrinho.innerHTML+=`${carrinho[c].nome} x${carrinho[c].q} = R$ ${s.toFixed(2)}<br>`;
   }
-
-  totalFinal.innerText = "TOTAL: R$ " + t.toFixed(2);
+  totalFinal.innerText="TOTAL: R$ "+t.toFixed(2);
 }
-
-function fecharCarrinho() {
-  carrinhoDiv.style.display = "none";
-}
-
-function finalizarPedido() {
-  let msg = "🛒 Pedido Carnivorous%0A%0A";
-  let total = 0;
-
-  for (const i in carrinho) {
-    const sub = carrinho[i].qtd * carrinho[i].preco;
-    total += sub;
-    msg += `${carrinho[i].nome}%0AQtd: ${carrinho[i].qtd}%0ASubtotal: R$ ${sub.toFixed(2)}%0A%0A`;
+function fecharCarrinho(){carrinhoDiv.style.display="none"}
+function finalizar(){
+  let m="Pedido Carnivorous%0A";
+  let t=0;
+  for(const c in carrinho){
+    const s=carrinho[c].q*carrinho[c].preco;
+    t+=s;
+    m+=`${carrinho[c].nome} x${carrinho[c].q} = R$ ${s.toFixed(2)}%0A`;
   }
-
-  msg += `TOTAL: R$ ${total.toFixed(2)}`;
-  window.open(`https://wa.me/5511999562721?text=${msg}`);
+  m+=`TOTAL: R$ ${t.toFixed(2)}`;
+  window.open("https://wa.me/5511999562721?text="+m);
 }
-
-function filtrarProdutos() {
-  const t = busca.value.toLowerCase();
-  const c = filtroCategoria.value;
-
-  renderizarProdutos(
-    listaProdutos.filter(p =>
-      p.nome.toLowerCase().includes(t) &&
-      (!c || p.categoria === c)
-    )
-  );
+function filtrar(){
+  const t=busca.value.toLowerCase();
+  const c=filtro.value;
+  renderizar(produtos.filter(p=>
+    p.nome.toLowerCase().includes(t)&&(!c||p.categoria===c)
+  ));
 }
 </script>
-
 </body>
 </html>
