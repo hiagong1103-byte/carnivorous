@@ -117,22 +117,11 @@ const carrinhoDiv = document.getElementById("carrinho");
 let listaProdutos = [];
 const carrinho = {};
 
-function formatarUnidade(unidade) {
-  if (!unidade) return "";
-  const u = unidade.toLowerCase();
-
-  if (u.includes("kilo") || u.includes("kg")) return "Kg";
-  if (u.includes("un")) return "Unidade";
-
-  return unidade;
-}
-
 Papa.parse(PLANILHA, {
   download: true,
   header: true,
   skipEmptyLines: true,
   complete: function(res) {
-
     listaProdutos = res.data.map(l => ({
       nome: l["Descrição do Produto"],
       categoria: l["Categoria"],
@@ -143,7 +132,7 @@ Papa.parse(PLANILHA, {
           .replace(/\./g, "")
           .replace(",", ".")
       )
-    })).filter(p => p.nome && p.categoria && p.preco && p.unidade);
+    })).filter(p => p.nome && p.categoria && p.preco);
 
     carregarCategorias();
     renderizarProdutos();
@@ -175,7 +164,7 @@ function renderizarProdutos(lista = listaProdutos) {
       produtosDiv.innerHTML += `
         <div class="produto">
           <b>${p.nome}</b><br>
-          R$ ${p.preco.toFixed(2)} / ${formatarUnidade(p.unidade)}
+          R$ ${p.preco.toFixed(2)}
           <div class="controle">
             <button onclick="remover('${p.nome}')">−</button>
             <span id="qtd-${id}">0</span>
@@ -201,7 +190,6 @@ function remover(nome) {
 
 function atualizar() {
   let q = 0, t = 0;
-
   document.querySelectorAll('[id^="qtd-"]').forEach(e => e.innerText = "0");
 
   for (const i in carrinho) {
@@ -234,21 +222,6 @@ function fecharCarrinho() {
 }
 
 function finalizarPedido() {
-  let tipo = prompt("Entrega ou Retirada?");
-  if (!tipo) return;
-
-  let entrega = tipo.toLowerCase().includes("entrega");
-  let endereco = "";
-
-  if (entrega) {
-    endereco = prompt("Informe o endereço completo:");
-    if (!endereco) return;
-    alert("⚠️ Cobramos taxa por KM. Valor informado no WhatsApp.");
-  }
-
-  let pagamento = prompt("Forma de pagamento: Débito, Crédito, Vale ou Pix");
-  if (!pagamento) return;
-
   let msg = "🛒 Pedido Carnivorous%0A%0A";
   let total = 0;
 
@@ -258,9 +231,7 @@ function finalizarPedido() {
     msg += `${i}%0AQtd: ${carrinho[i].qtd}%0ASubtotal: R$ ${sub.toFixed(2)}%0A%0A`;
   }
 
-  msg += `TOTAL: R$ ${total.toFixed(2)}%0A`;
-  msg += entrega ? `📍 Endereço: ${endereco}%0A` : "🏪 Retirada no local%0A";
-  msg += `💳 Pagamento: ${pagamento}`;
+  msg += `TOTAL: R$ ${total.toFixed(2)}`;
 
   window.open(`https://wa.me/5511999562721?text=${msg}`);
 }
