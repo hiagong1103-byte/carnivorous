@@ -5,7 +5,6 @@
 <title>Carnivorous</title>
 
 <script src="https://cdn.jsdelivr.net/npm/papaparse@5.4.1/papaparse.min.js"></script>
-<script src="https://maps.googleapis.com/maps/api/js?key=AIzaSyAR8CwWiIzxPP1Ly2LVWpbXRQYzUzi-JhY&libraries=places"></script>
 
 <style>
 body {
@@ -16,11 +15,16 @@ body {
 }
 
 header {
-  display: flex;
-  align-items: center;
-  gap: 20px;
   padding: 20px;
   border-bottom: 2px solid #111;
+  display: flex;
+  gap: 10px;
+  flex-wrap: wrap;
+}
+
+header h1 {
+  width: 100%;
+  margin: 0 0 10px;
 }
 
 header input, header select {
@@ -31,7 +35,13 @@ header input, header select {
 
 #produtos { padding: 20px; }
 
-.categoria h2 { border-bottom: 2px solid #333; }
+.categoria {
+  margin-top: 30px;
+}
+
+.categoria h2 {
+  border-bottom: 2px solid #333;
+}
 
 .produto {
   border-bottom: 1px solid #222;
@@ -59,6 +69,7 @@ header input, header select {
   border-radius: 14px;
   cursor: pointer;
   font-weight: bold;
+  text-align: center;
 }
 
 #carrinho {
@@ -82,7 +93,6 @@ header input, header select {
 }
 
 .amarelo { background: #ffcc00; color: #000; }
-.verde { background: #25d366; color: #000; }
 .cinza { background: #333; color: #fff; }
 </style>
 </head>
@@ -91,7 +101,7 @@ header input, header select {
 
 <header>
   <h1>CARNIVOROUS</h1>
-  <input id="busca" placeholder="Buscar..." onkeyup="filtrarProdutos()">
+  <input id="busca" placeholder="Buscar produto..." onkeyup="filtrarProdutos()">
   <select id="filtroCategoria" onchange="filtrarProdutos()"></select>
 </header>
 
@@ -105,7 +115,6 @@ header input, header select {
 <div id="carrinho">
   <h2>Carrinho</h2>
   <div id="conteudoCarrinho"></div>
-  <button class="amarelo" onclick="escolherEntrega()">Finalizar pedido</button>
   <button class="cinza" onclick="fecharCarrinho()">Fechar</button>
 </div>
 
@@ -119,35 +128,55 @@ const totalCarrinho = document.getElementById("totalCarrinho");
 const filtroCategoria = document.getElementById("filtroCategoria");
 const busca = document.getElementById("busca");
 
-/* ===== CONFIG ===== */
+/* ===== PLANILHA ===== */
 const PLANILHA =
 "https://docs.google.com/spreadsheets/d/15osZ7x4v43t8yFdOs90W4oQnHdY-CJvF3qnTEz1SKjQ/pub?output=csv";
 
-const ENDERECO_LOJA = "Rua David Ben Gurion, 1074, Jardim Monte Kemel, São Paulo - SP";
-const TAXA_POR_KM = 5;
-const WHATSAPP_LOJA = "5511999562721";
-
+/* ===== DADOS ===== */
 let listaProdutos = [];
 let carrinho = {};
-let totalProdutos = 0;
 
-/* ===== CARREGAR PRODUTOS ===== */
+/* ===== CARREGAR PLANILHA (ROBUSTO) ===== */
 Papa.parse(PLANILHA, {
   download: true,
   header: true,
-  complete: res => {
+  skipEmptyLines: true,
+  complete: function(res) {
+
     listaProdutos = res.data
-      .filter(p => p["Descrição do Produto"] && p["Valor Venda"])
-      .map(p => ({
-        nome: p["Descrição do Produto"],
-        categoria: p["Categoria"] || "Outros",
-        preco: Number(
-          String(p["Valor Venda"])
-            .replace("R$", "")
-            .replace(/\./g, "")
-            .replace(",", ".")
-        )
-      }));
+      .map(linha => {
+
+        const nome =
+          linha["Descrição do Produto"] ||
+          linha["Descricao do Produto"] ||
+          linha["Produto"] ||
+          linha["Nome"];
+
+        const categoria =
+          linha["Categoria"] ||
+          linha["Tipo"] ||
+          "Outros";
+
+        const valor =
+          linha["Valor Venda"] ||
+          linha["Valor de Venda"] ||
+          linha["Preço"] ||
+          linha["Preco"];
+
+        if (!nome || !valor) return null;
+
+        return {
+          nome: nome.trim(),
+          categoria: categoria.trim(),
+          preco: Number(
+            String(valor)
+              .replace("R$", "")
+              .replace(/\./g, "")
+              .replace(",", ".")
+          )
+        };
+      })
+      .filter(p => p && !isNaN(p.preco));
 
     carregarCategorias();
     renderizarProdutos();
@@ -164,17 +193,17 @@ function carregarCategorias() {
 
 function renderizarProdutos(lista = listaProdutos) {
   produtosDiv.innerHTML = "";
-  const grupo = {};
+  const porCategoria = {};
 
   lista.forEach(p => {
-    grupo[p.categoria] = grupo[p.categoria] || [];
-    grupo[p.categoria].push(p);
+    porCategoria[p.categoria] = porCategoria[p.categoria] || [];
+    porCategoria[p.categoria].push(p);
   });
 
-  for (let cat in grupo) {
+  for (const cat in porCategoria) {
     produtosDiv.innerHTML += `<div class="categoria"><h2>${cat}</h2></div>`;
-    grupo[cat].forEach(p => {
-      const id = p.nome.replace(/\W/g, "");
+    porCategoria[cat].forEach(p => {
+      const id = p.nome.replace(/\W/g,"");
       produtosDiv.innerHTML += `
         <div class="produto">
           <b>${p.nome}</b><br>
@@ -184,48 +213,53 @@ function renderizarProdutos(lista = listaProdutos) {
             <span id="qtd-${id}">0</span>
             <button onclick="adicionar('${p.nome}', ${p.preco})">+</button>
           </div>
-        </div>`;
+        </div>
+      `;
     });
   }
 }
 
-/* ===== CARRINHO ===== */
 function adicionar(nome, preco) {
   carrinho[nome] = carrinho[nome] || { qtd: 0, preco };
   carrinho[nome].qtd++;
-  atualizar();
+  atualizarCarrinho();
 }
 
 function remover(nome) {
   if (!carrinho[nome]) return;
   carrinho[nome].qtd--;
   if (carrinho[nome].qtd <= 0) delete carrinho[nome];
-  atualizar();
+  atualizarCarrinho();
 }
 
-function atualizar() {
-  let q = 0, t = 0;
+function atualizarCarrinho() {
+  let qtd = 0;
+  let total = 0;
+
   document.querySelectorAll('[id^="qtd-"]').forEach(e => e.innerText = "0");
 
-  for (let i in carrinho) {
-    q += carrinho[i].qtd;
-    t += carrinho[i].qtd * carrinho[i].preco;
+  for (const i in carrinho) {
+    qtd += carrinho[i].qtd;
+    total += carrinho[i].qtd * carrinho[i].preco;
     const el = document.getElementById("qtd-" + i.replace(/\W/g,""));
     if (el) el.innerText = carrinho[i].qtd;
   }
 
-  qtdCarrinho.innerText = q;
-  totalCarrinho.innerText = "R$ " + t.toFixed(2);
-  totalProdutos = t;
+  qtdCarrinho.innerText = qtd;
+  totalCarrinho.innerText = "R$ " + total.toFixed(2);
 }
 
 function abrirCarrinho() {
   let html = "";
-  for (let i in carrinho) {
-    const s = carrinho[i].qtd * carrinho[i].preco;
-    html += `${carrinho[i].qtd}x <b>${i}</b> - R$ ${s.toFixed(2)}<br>`;
+  let total = 0;
+
+  for (const i in carrinho) {
+    const sub = carrinho[i].qtd * carrinho[i].preco;
+    total += sub;
+    html += `${carrinho[i].qtd}x <b>${i}</b> — R$ ${sub.toFixed(2)}<br>`;
   }
-  html += `<hr><b>Total produtos: R$ ${totalProdutos.toFixed(2)}</b>`;
+
+  html += `<hr><b>Total: R$ ${total.toFixed(2)}</b>`;
   conteudoCarrinho.innerHTML = html;
   carrinhoDiv.style.display = "block";
 }
@@ -235,12 +269,13 @@ function fecharCarrinho() {
 }
 
 function filtrarProdutos() {
-  const t = busca.value.toLowerCase();
-  const c = filtroCategoria.value;
+  const texto = busca.value.toLowerCase();
+  const cat = filtroCategoria.value;
+
   renderizarProdutos(
     listaProdutos.filter(p =>
-      p.nome.toLowerCase().includes(t) &&
-      (!c || p.categoria === c)
+      p.nome.toLowerCase().includes(texto) &&
+      (!cat || p.categoria === cat)
     )
   );
 }
