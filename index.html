@@ -118,21 +118,22 @@ const carrinhoDiv = document.getElementById("carrinho");
 
 Papa.parse(PLANILHA_URL, {
   download:true,
-  header:true,
   skipEmptyLines:true,
   complete: function(res){
 
     listaProdutos = res.data
-      .map(l => ({
-        nome: l["DESCRIÇÃO DO PRODUTO"],
-        categoria: l["CATEGORIA"],
-        preco: parseFloat(
-          String(l["VALOR DE VENDA"])
-            .replace("R$","")
-            .replace(/\./g,"")
-            .replace(",",".")
-        )
-      }))
+      .map(l => {
+        return {
+          nome: l[1],       // coluna descrição
+          categoria: l[2],  // coluna categoria
+          preco: Number(
+            String(l[4] || "")
+              .replace("R$","")
+              .replace(/\./g,"")
+              .replace(",",".")
+          )
+        };
+      })
       .filter(p => p.nome && p.categoria && p.preco > 0);
 
     carregarCategorias();
